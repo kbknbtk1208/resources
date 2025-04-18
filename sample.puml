@@ -1,0 +1,62 @@
+@startuml login
+actor User as user
+participant "Browser" as browser
+participant "BFF" as bff
+participant "Backend" as backend
+database "DB" as db
+
+== 通常ログインフロー ==
+user -> browser: メールアドレス/パスワードを入力
+browser -> bff: POST /api/auth/login\n(メールアドレス、パスワード、user agent)
+bff -> backend: POST /login\n(メールアドレス、パスワード、user agent)
+backend -> db: メールアドレスで検索
+db --> backend: ユーザー情報
+backend -> backend: パスワードハッシュ照合
+alt パスワード照合成功
+  backend -> backend: MFA判定（mfaカラムとuser agentを比較）
+  alt 2要素認証が必要な場合
+    backend --> bff: 401エラー + サブコード001
+    bff --> browser: 401エラー + サブコード001
+
+    == 2要素認証フロー ==
+    browser -> bff: POST /api/auth/mfa\n(メールアドレス)
+    bff -> backend: POST /MFA/generate-session\n(メールアドレス)
+    backend -> backend: sessionKeyとpassCodeを生成
+    backend -> db: sessionKeyとpassCodeを保存
+    backend -> user: passCodeをメールで送信
+    backend --> bff: sessionKey
+    bff -> bff: sessionKeyをセッションに保存
+    bff --> browser: status: 200
+    user -> browser: パスコードを入力
+    browser -> bff: POST /api/auth/mfa/login\n(メールアドレス、パスコード)
+    bff -> bff: sessionKeyの存在確認
+    alt sessionKeyが存在する場合
+      bff -> backend: POST /MFA/login\n(メールアドレス、パスコード、sessionKey)
+      backend -> db: メールアドレスで検索
+      db --> backend: ユーザー情報(sessionKey、passCode)
+      backend -> backend: sessionKeyとpassCodeを照合
+      alt 照合成功
+        backend --> bff: status: 200
+        bff --> browser: status: 200
+        browser --> user: ログイン成功
+      else 照合失敗
+        backend --> bff: エラー
+        bff --> browser: エラー
+        browser --> user: ログイン失敗
+      end
+    else sessionKeyがない場合
+      bff --> browser: 419エラー
+      browser --> user: ログイン失敗
+    end
+  else 2要素認証が不要な場合
+    backend --> bff: status: 200
+    bff --> browser: status: 200
+    browser --> user: ログイン成功
+  end
+else パスワード照合失敗
+  backend --> bff: 認証エラー
+  bff --> browser: 認証エラー
+  browser --> user: ログイン失敗
+end
+
+@enduml
