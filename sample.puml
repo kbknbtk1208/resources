@@ -1,4 +1,4 @@
-@startuml login
+@startuml
 actor User as user
 participant "Browser" as browser
 participant "BFF" as bff
@@ -6,57 +6,94 @@ participant "Backend" as backend
 database "DB" as db
 
 == 通常ログインフロー ==
-user -> browser: メールアドレス/パスワードを入力
-browser -> bff: POST /api/auth/login\n(メールアドレス、パスワード、user agent)
-bff -> backend: POST /login\n(メールアドレス、パスワード、user agent)
-backend -> db: メールアドレスで検索
+activate user
+user -> browser: mailAddress/パスワードを入力
+activate browser
+browser -> bff: POST /api/auth/login\n(mailAddress、パスワード、user agent)
+activate bff
+bff -> backend: POST /login\n(mailAddress、パスワード、user agent)
+activate backend
+backend -> db: mailAddressで検索
+activate db
 db --> backend: ユーザー情報
+deactivate db
 backend -> backend: パスワードハッシュ照合
 alt パスワード照合成功
   backend -> backend: MFA判定（mfaカラムとuser agentを比較）
   alt 2要素認証が必要な場合
     backend --> bff: 401エラー + サブコード001
+    deactivate backend
     bff --> browser: 401エラー + サブコード001
+    deactivate bff
 
     == 2要素認証フロー ==
-    browser -> bff: POST /api/auth/mfa\n(メールアドレス)
-    bff -> backend: POST /MFA/generate-session\n(メールアドレス)
+    browser -> bff: POST /api/auth/mfa\n(mailAddress)
+    activate bff
+    bff -> backend: POST /MFA/generate-session\n(mailAddress)
+    activate backend
     backend -> backend: sessionKeyとpassCodeを生成
     backend -> db: sessionKeyとpassCodeを保存
+    activate db
+    deactivate db
     backend -> user: passCodeをメールで送信
     backend --> bff: sessionKey
+    deactivate backend
     bff -> bff: sessionKeyをセッションに保存
     bff --> browser: status: 200
-    user -> browser: パスコードを入力
-    browser -> bff: POST /api/auth/mfa/login\n(メールアドレス、パスコード)
+    deactivate bff
+    user -> browser: passCodeを入力
+    browser -> bff: POST /api/auth/mfa/login\n(mailAddress、passCode)
+    activate bff
     bff -> bff: sessionKeyの存在確認
     alt sessionKeyが存在する場合
-      bff -> backend: POST /MFA/login\n(メールアドレス、パスコード、sessionKey)
-      backend -> db: メールアドレスで検索
+      bff -> backend: POST /MFA/login\n(mailAddress、passCode、sessionKey)
+      activate backend
+      backend -> db: mailAddressで検索
+      activate db
       db --> backend: ユーザー情報(sessionKey、passCode)
+      deactivate db
       backend -> backend: sessionKeyとpassCodeを照合
       alt 照合成功
         backend --> bff: status: 200
+        deactivate backend
         bff --> browser: status: 200
+        deactivate bff
         browser --> user: ログイン成功
+        deactivate browser
+        deactivate user
       else 照合失敗
         backend --> bff: エラー
+        deactivate backend
         bff --> browser: エラー
+        deactivate bff
         browser --> user: ログイン失敗
+        deactivate browser
+        deactivate user
       end
     else sessionKeyがない場合
       bff --> browser: 419エラー
+      deactivate bff
       browser --> user: ログイン失敗
+      deactivate browser
+      deactivate user
     end
   else 2要素認証が不要な場合
     backend --> bff: status: 200
+    deactivate backend
     bff --> browser: status: 200
+    deactivate bff
     browser --> user: ログイン成功
+    deactivate browser
+    deactivate user
   end
 else パスワード照合失敗
   backend --> bff: 認証エラー
+  deactivate backend
   bff --> browser: 認証エラー
+  deactivate bff
   browser --> user: ログイン失敗
+  deactivate browser
+  deactivate user
 end
 
 @enduml
