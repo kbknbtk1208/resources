@@ -1,0 +1,37 @@
+{
+  "Comment": "汎用承認ワークフローコンポーネント",
+  "StartAt": "SendApprovalRequest",
+  "States": {
+    "SendApprovalRequest": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke.waitForTaskToken",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:REGION:ACCOUNT_ID:function:YOUR_REQUEST_APPROVAL_LAMBDA_NAME", // ここを実際のLambda ARNに置き換えてください
+        "Payload": {
+          "taskToken.$": "$$.Task.Token", // タスクのトークンをLambdaに渡す
+          "approverEmail.$": "$.approverEmail",
+          "requestMessage.$": "$.requestMessage"
+        }
+      },
+      "TimeoutSeconds": 86400, // 例: 承認待ちタイムアウトを1日 (86400秒) に設定
+      "HeartbeatSeconds": 3600, // 例: 1時間ごとにハートビートを要求（オプション）
+      "Next": "ApprovalProcessSucceeded",
+      "Catch": [
+        // タイムアウトやLambdaエラーをキャッチする場合
+        {
+          "ErrorEquals": ["States.Timeout", "States.TaskFailed"],
+          "Next": "ApprovalProcessFailed"
+        }
+      ]
+    },
+    "ApprovalProcessSucceeded": {
+      "Type": "Succeed",
+      "Comment": "承認プロセス成功。呼び出し元ワークフローに結果を返す。"
+    },
+    "ApprovalProcessFailed": {
+      "Type": "Fail",
+      "Cause": "承認プロセスが失敗またはタイムアウトしました。",
+      "Error": "ApprovalFailedOrTimedOut"
+    }
+  }
+}
