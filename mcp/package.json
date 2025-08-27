@@ -1,0 +1,37 @@
+{
+  "name": "project-conventions-mcp",
+  "version": "2.0.0",
+  "description": "MCP server providing project conventions and coding rules via markdown files",
+  "main": "build/index.js",
+  "bin": {
+    "project-conventions-mcp": "./build/index.js"
+  },
+  "scripts": {
+    "build": "tsc && npm run copy-resources",
+    "copy-resources": "copyfiles -u 0 \"resources/**/*\" build/",
+    "dev": "tsx src/index.ts",
+    "start": "node build/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "server",
+    "conventions",
+    "coding-rules",
+    "markdown"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "copyfiles": "^2.4.1",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  },
+  "files": [
+    "build/",
+    "README.md"
+  ]
+}
